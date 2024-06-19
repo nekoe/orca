@@ -159,4 +159,8 @@ function engine_timber.param(cls)
   end
 end
 
+function engine_timber.noteKillAll()
+  engine.noteKillAll()
+end
+
 return engine_timber

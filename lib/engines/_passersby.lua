@@ -213,4 +213,8 @@ function engine_passersby.param(cls)
   end
 end
 
+function engine_passersby.noteKillAll()
+  engine.noteKillAll()
+end
+
 return engine_passersby

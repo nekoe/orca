@@ -70,4 +70,8 @@ function engine_polyperc.param(cls)
   end
 end
 
+function engine_polyperc.noteKillAll()
+  -- do nothing
+end
+
 return engine_polyperc

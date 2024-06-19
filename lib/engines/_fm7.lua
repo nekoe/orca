@@ -149,4 +149,8 @@ function engine_fm7.param(cls)
   end
 end
 
+function engine_fm7.noteKillAll()
+  engine.stopAll()
+end
+
 return engine_fm7

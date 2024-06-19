@@ -638,9 +638,19 @@ function clock.transport.start()
 end
 
 function clock.transport.stop()
+  if not running then
+    return
+  end
+
   print("Stop Clock")
   clock.cancel(update_id)
   running = false
+
+  engines.get_synth().noteKillAll()
+
+  for i = 1, 6 do
+    softcut.play(i, 0)
+  end
 end
 
 --- Copies ./tutorials into ~/dust/data/orca/tutorials
@@ -810,10 +820,6 @@ keyboard.code = function(c, val)
   elseif (code == hid.codes.KEY_SPACE) and (val == 1) then
     if running then
       clock.transport.stop()
-      engine.noteKillAll()
-      for i = 1, 6 do
-        softcut.play(i, 0)
-      end
     else
       clock.transport.start()
     end
@@ -1048,5 +1054,6 @@ end
 
 --- Writes Orca state params on script end.
 function cleanup()
+  clock.transport.stop()
   orca.state:write(norns.state.data .. "orca-state.pset")
 end
