@@ -88,7 +88,7 @@ local orca = {
   cell = {},
   locks = {},
   info = {},
-  active_notes = {},
+  active_midi_notes = {},
   chars = keycodes.chars,
   notes = {"C", "c", "D", "d", "E", "F", "f", "G", "g", "A", "a", "B"},
   sc_ops = {
@@ -151,34 +151,58 @@ function orca:interval_ratio(n)
   return music.interval_to_ratio(n)
 end
 
-function orca:add_note(ch, note, length, mono)
-  local id = self:index_at(self.x, self.y)
-  if self.active_notes[id] == nil then
-    self.active_notes[id] = {}
-  end
-  if mono then
-    self.active_notes[id][ch] = {note, length}
-  elseif not mono then
-    if self.active_notes[id][note] == note then
-      self.midi_out_device:note_off(note, nil, ch)
-    else
-      self.active_notes[id][note] = {note, length}
+
+function orca:before_bang_midi_note_at(x, y, ch, note, length, mono)
+    if self.active_midi_notes[ch] == nil then
+        self.active_midi_notes[ch] = {}
     end
-  end
+    if self.active_midi_notes[ch][note] == nil then
+        self.active_midi_notes[ch][note] = {}
+    end
+
+    local notes = self.active_midi_notes[ch]
+    for n, _ in pairs(notes) do
+        if mono or (n == note) then
+            self.midi_out_device:note_off(n, nil, ch)
+            self.active_midi_notes[ch][n] = {}
+        end
+    end
+
+    local id = self:index_at(x, y)
+    self.active_midi_notes[ch][note][id] = length
 end
 
-function orca:notes_off(ch)
-  local id = self:index_at(self.x, self.y)
-  if self.active_notes[id] ~= nil then
-    for k, v in pairs(self.active_notes[id]) do
-      local note, length = self.active_notes[id][k][1], util.clamp(self.active_notes[id][k][2], 1, 16)
-      if self.frame % length == 0 then
-        self.midi_out_device:note_off(note, nil, ch)
-        self.active_notes[id][k] = nil
-      end
+
+function orca:tick_midi_notes()
+    for ch, notes in pairs(self.active_midi_notes) do
+        for note, ids in pairs(notes) do
+
+            local active = false
+            for id, length in pairs(ids) do
+                if length >= 1 then
+                    active = true
+                    self.active_midi_notes[ch][note][id] = length - 1
+                elseif length == 0 then
+                    self.active_midi_notes[ch][note][id] = nil
+                end
+            end
+            if not active then
+                self.midi_out_device:note_off(note, nil, ch)
+            end
+        end
     end
-  end
 end
+
+
+function orca:all_midi_notes_off()
+    for ch, notes in pairs(self.active_midi_notes) do
+        for note, _ in pairs(notes) do
+            self.midi_out_device:note_off(note, nil, ch)
+        end
+    end
+    self.active_midi_notes = {}
+end
+
 
 function orca.load_project(pth)
   local filename = pth:match("^.+/(.+)$")
@@ -463,6 +487,8 @@ function orca:operate()
     end
   end
 
+  self:tick_midi_notes()
+
   pt = {}
   self.frame = self.frame + 1
 end
@@ -647,6 +673,7 @@ function clock.transport.stop()
   running = false
 
   engines.get_synth().noteKillAll()
+  orca:all_midi_notes_off()
 
   for i = 1, 6 do
     softcut.play(i, 0)
