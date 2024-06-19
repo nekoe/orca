@@ -4,8 +4,7 @@ local engine_fm7 = {
   input_ids = {
     "octave",
     "note",
-    "voice",
-    "amp"
+    "voice"
   },
   param_ids = {
     "hz",
@@ -40,11 +39,11 @@ local engine_fm7 = {
     "Osc6 Phase Mod Osc"
   },
   ports = {
-    "num"
+    "operator"
   }
 }
 
-local prev_transposed
+-- local prev_transposed
 
 function hz(num)
   return util.linlin(0, 1, 1, 32, num) or 1
@@ -87,21 +86,22 @@ end
 function engine_fm7.run(octave, note, cls)
   local transposed = cls:transpose(note, octave)
   local hz = cls:note_freq(transposed[1])
-  -- local amp = (cls:listen(cls.x + 4, cls.y) / 35) or 1
+  local voice = util.clamp(cls:listen(cls.x + 3, cls.y) or 1, 1, MAX_NUM_VOICES)
 
   -- include handling of bang
   if cls:neighbor(cls.x, cls.y, "*") and note ~= "." and note ~= "" then
-    if prev_transposed ~= nil then
-      engine.stop(prev_transposed[1])
-    end
-    -- engine.amp(amp)
-    engine.start(transposed[1], hz)
+    engine.start(voice, hz)
+    -- if prev_transposed ~= nil then
+    --   engine.stop(prev_transposed[1])
+    -- end
+    -- engine.start(transposed[1], hz)
 
-    prev_transposed = transposed
+    -- prev_transposed = transposed
   else
-    if prev_transposed ~= nil then
-      engine.stop(prev_transposed[1])
-    end
+    engine.stop(voice)
+    -- if prev_transposed ~= nil then
+    --   engine.stop(prev_transposed[1])
+    -- end
   end
 end
 
@@ -109,33 +109,33 @@ end
 -- @param cls {class}    Orca class
 function engine_fm7.param(cls)
   local param = util.clamp(cls:listen(cls.x + 1, cls.y) or 1, 1, #engine_fm7.param_ids)
-  local mod_num = util.clamp(cls:listen(cls.x + 3, cls.y) or 1, 1, 6) or 1
-  local val = cls:listen(cls.x + 3, cls.y) or 1
+  local param_id = engine_fm7.param_ids[param]
+  
+  local val = cls:listen(cls.x + 2, cls.y) or 1
   local val_norm = (val / 35)
-
-  local name = engine_fm7.param_names[param]
-  local id = engine_fm7.param_ids[param]
+  
+  local operator = util.clamp(cls:listen(cls.x + 3, cls.y) or 1, 1, 6) or 1
 
   if cls:neighbor(cls.x, cls.y, "*") then
     local num = -1
 
-    if string.find(id, "hz") then
+    if string.find(param_id, "hz") then
       num = hz(val_norm)
-    elseif string.find(id, "phase") then
+    elseif string.find(param_id, "phase") then
       num = phase(val_norm)
-    elseif string.find(id, "amp") then
+    elseif string.find(param_id, "amp") then
       num = amp(val_norm)
-    elseif string.find(id, "_to_") then
+    elseif string.find(param_id, "_to_") then
       num = phase(val_norm)
-    elseif string.find(id, "carrier") then
+    elseif string.find(param_id, "carrier") then
       num = carrier(val_norm)
-    elseif string.find(id, "opAmpA") then
+    elseif string.find(param_id, "opAmpA") then
       num = attack_release(val_norm)
-    elseif string.find(id, "opAmpD") then
+    elseif string.find(param_id, "opAmpD") then
       num = decay(val_norm)
-    elseif string.find(id, "opAmpS") then
+    elseif string.find(param_id, "opAmpS") then
       num = sustain(val_norm)
-    elseif string.find(id, "opAmpR") then
+    elseif string.find(param_id, "opAmpR") then
       num = attack_release(val_norm)
     end
 
@@ -143,7 +143,7 @@ function engine_fm7.param(cls)
       if num == nil or unexpected_condition then
         print("Oops! Unexpected " .. engine.name .. " engine error.")
       else
-        engine.commands[id .. mod_num].func(num)
+        engine.commands[param_id .. operator].func(num)
       end
     end
   end
